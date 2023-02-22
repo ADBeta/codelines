@@ -1,0 +1,53 @@
+/*******************************************************************************
+* This file is part of codelines. Please see the github:
+* https://github.com/ADBeta/codelines
+*
+* codelines is a program to count the lines of -code- in a file or recursively
+* in a directory, ignoring blank lines, spaces and comments. Built mainly for 
+* C++ but has CLI flags to change the language.
+*
+* (c) ADBeta
+* v0.0
+* 22 Feb 2023
+*******************************************************************************/
+#include <iostream>
+#include <string>
+
+#include "TeFiEd.hpp"
+#include "CLIah.hpp"
+
+
+//Returns true/false if the line passed is a valid code line. Adjusts rules
+//based on which language is selected.
+bool isValidLine(std::string inLine) {
+	//If multiline comment is enabled or not. used later per language
+	static bool multilineComment = false;
+
+/** Basic checks **/
+	//Get the position of the first char
+	size_t firstCharPos = inLine.find_first_not_of(" \t");
+	
+	//Regardless of language, an empty line, only tabs or spaces are not valid
+	if(inLine.empty() || firstCharPos == std::string::npos) return false;
+
+	//If the first chars are // the line is a comment so exit
+	if(inLine.substr(firstCharPos, 2) == "//") return false; 
+
+
+/** Multiline checks **/
+	//Get the start and end pos of the multiline strings
+	size_t multiStartPos = inLine.find("/*");
+	size_t multiEndPos = inLine.find("*/");
+	
+	//If the line contains the multiline comment string
+	if(multiStartPos != std::string::npos) {
+		//if the multi end pos exists on this line
+		if(multiEndPos != std::string::npos) {
+			//Ignore all end tabs and spaces. if \* is not the end of the line
+			//this is single line comment, with code after it
+			if(multiEndPos != inLine.find_last_not_of(" \t")) {
+				return true;
+			} else {
+				return false;
+			}
+		}
