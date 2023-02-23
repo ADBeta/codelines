@@ -7,8 +7,8 @@
 * C++ but has CLI flags to change the language.
 *
 * (c) ADBeta
-* v0.4
-* 22 Feb 2023
+* v0.6
+* 23 Feb 2023
 *******************************************************************************/
 #include <iostream>
 #include <string>
@@ -16,117 +16,122 @@
 #include "TeFiEd.hpp"
 #include "CLIah.hpp"
 
+struct Language {
+	//Comment strings
+	std::string singleLineComment;
+	std::string multiLineCommentBeg;
+	std::string multiLineCommentEnd;
 
-//Types of comments that can be detected and returned by isLineComment.
-//Examples using C/C++ style:
-//none
-//single              //comment
-//multi-single        /** comment **/
-//multi-start         /* comment .....
-//multi-end           ..... comment */
-enum class CommentType { none, single, multiSingle, multiStart, multiEnd };
+}; //struct Language
 
-//Returns CommentType (see above) of the comment, if any, is found in the line.
-CommentType lineCommentType(std::string fileLine) {
-	//Get the position of the first non-empty char
-	size_t firstCharPos = fileLine.find_first_not_of(" \t");
+Language *selLang;
 
-	//If the first chars are // the line is a single comment
-	if(fileLine.substr(firstCharPos, 2) == "//") return CommentType::single;
-	
-	//Try to find the start and end multiline strings.
-	size_t multiStartPos = fileLine.find("/*");
-	size_t multiEndPos = fileLine.find("*/");
-	
-	//If there is a /* in the line
-	if(multiStartPos != std::string::npos) {
-		//If there is an end string
-		if(multiEndPos != std::string::npos) {
-			if(multiEndPos > multiStartPos) {
-				//If the end string is found, and is after the start string, 
-				//this line is a multi-single (eg. /* comment */)
-				return CommentType::multiSingle;
-			} else {
-				//If end appears before start, this is two multiline strings 
-				//butted against eachother (eg. ...comment 1 */ /* comment 2...)
-				return CommentType::multiStart;
-			}
-		}
+
+//Removed all the comment strings from the TeFiEd Vector
+void removeSingleComments(TeFiEd &inFile) {
+	//Go through all lines in the file
+	for(size_t cLine = 1; cLine <= inFile.lines(); cLine++) {
+		std::string lineStr = inFile.getLine(cLine);
+		
+		//Find any language specific single comment string
+		size_t commentPos = lineStr.find(selLang->singleLineComment);
+		if(commentPos != std::string::npos) {
+			//If commentPos is a valid position, erase from that point to
+			//the end of the string (Will leave blank lines behind)
+			lineStr.erase(commentPos, std::string::npos);
 			
-		//If there is no end string, this is just a multiline start, this can
-		//cause issues, as "code; /* comment..." is a valid line, but will be
-		//returned as invalid. Keep and eye on this issue
-		return CommentType::multiStart;
+			//Then remove the line we just modified
+			inFile.removeLine(cLine);			
+			//And push the new line to that index
+			inFile.insertString(lineStr, cLine);
+		}
 	}
-
-	//Check if there is an end string now that start and combo strings are done
-	if(multiEndPos != std::string::npos) {
-		//again, there could be an issue here with the end of a comment, but
-		//some valid code after it. keep an eye for this (eg. comment */ code;)
-		return CommentType::multiEnd;
-	}
-
-	//If no conditions are met, this line is not a comment
-	return CommentType::none;
 }
 
-//Returns true/false if the line passed is a valid code line. Adjusts rules
-//based on which language is selected.
-bool isValidLine(std::string fileLine) {
-	//Get the position of the first non-empty char
-	size_t firstCharPos = fileLine.find_first_not_of(" \t");
-
-	//If multiline start has been seen but the end has not. Guards a multiline
-	static bool multilineComment = false;
-
-	//Regardless of language, an empty line or only tabs or spaces is not valid
-	if(fileLine.empty() || firstCharPos == std::string::npos) return false;
+//Removed all the blank lines from the TeFiEd Vector
+void removeBlankLines(TeFiEd &inFile) {
+	//Current line
+	size_t cLine = 1;
 	
-	//Get the line comment type for later
-	CommentType lType = lineCommentType(fileLine);
+	while(cLine <= inFile.lines()) {
+		std::string lineStr = inFile.getLine(cLine);
 	
-	//Simple checks
-	if(lType == CommentType::single || lType == CommentType::multiSingle) {
-		return false;
+		//If the current line only has spaces or tabs, it is empty.
+		if(lineStr.find_first_not_of(" \t") == std::string::npos) {
+			//Delete that line from the file
+			inFile.removeLine(cLine);			
+		} else {
+			//Otherwise the line has info, skip this line.
+			//NOTE: Do not inc after remove because this could skip a possible
+			//empty line
+			++cLine;
+		}
 	}
-	
-	//Setup the multiline flag
-	if(lType == CommentType::multiStart) {
-		multilineComment = true;
-		return false;
-	}
-	
-	if(lType == CommentType::multiEnd) {
-		multilineComment = false;
-		return false;
-	}
-	
-	//If multiline is active currently, just fail
-	if(multilineComment == true) return false;
-	
-	//If the line hasn't failed yet, it is a valid line
-	return true;
 }
 
 /*** Main *********************************************************************/
 int main(int argc, char *argv[]){
+	/*** Command Line setup ***************************************************/
+	//Configure CLIah
+	CLIah::Config::verbose = true; //Set verbosity when match is found
+	CLIah::Config::stringsEnabled = true; //Enable arbitrary strings
 	
+	//Language selection argument
+	CLIah::addNewArg(
+		"Language",                          //Reference
+		"--language",                        //Primary match string
+		CLIah::ArgType::subcommand,          //Argument type
+		"-L"                                 //Alias match string
+	);
+	
+	
+	
+	CLIah::analyseArgs(argc, argv);
+	
+	Language C_family;
+	C_family.singleLineComment = "//";
+	C_family.multiLineCommentBeg = "/*";
+	C_family.multiLineCommentEnd = "*/";
+	
+	
+	
+	if(CLIah::isDetected("Language") == false) {
+		//Default behaviour if language is not specified by the user
+		selLang = &C_family;
+	} else {
+	
+	}
+	
+	/**********************************/
 	
 	//TeFiEd input file pointer - gets swapped multiple times.
 	TeFiEd *codeFile;;
 	
 	
+	
+	/**********************************/
 	//Create a new TeFiEd object with text file
 	codeFile = new TeFiEd("./test.txt");
 	
 	codeFile->setVerbose(true);
 	
 	//Read in the file, with error handling
-	codeFile->read();
+	if(codeFile->read() != 0) {
+		std::cerr << "Error: Unable to open file " << codeFile->filename() 
+		          << ". Exiting" << std::endl;
+		exit(EXIT_FAILURE);
+	}
 	
-	for(size_t x = 1; x < codeFile->lines() + 1; x++) {
-		std::string line = codeFile->getLine(x);
-		std::cout << line << "\t\t" << isValidLine(line) << std::endl;
+	
+	/*****/
+	
+	removeSingleComments(*codeFile);
+	
+	//Lastly remove the blank lines, which is also a cleanup from the last steps
+	removeBlankLines(*codeFile);
+	
+	for(size_t cLine = 1; cLine <= codeFile->lines(); cLine++) {
+		std::cout << codeFile->getLine(cLine) << std::endl;
 	}
 	
 	//Clear RAM of the TeFiEd object ready for end or next loop.

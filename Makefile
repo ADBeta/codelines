@@ -15,9 +15,9 @@ OBJS := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS))
 CC := g++
 
 #Flags
-CPPFLAGS := -Iinclude -MMD -MP #NOTE. Include path is to /usr/include. this may be arch specific
+CPPFLAGS := -Iinclude -MMD -MP
 CFLAGS   := -Wall
-LDFLAGS  := -Llib -lboost_system -lboost_filesystem
+LDFLAGS  := -Llib
 LDLIBS   := -lm 
 
 .PHONY: all clean

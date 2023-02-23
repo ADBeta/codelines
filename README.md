@@ -27,6 +27,7 @@ dependencies.
 ## Changelog (Reminder for self)
 * 0.0 - Initial setup
 * 0.4 - basic functional model
+* 0.6 - changed entire methodolgy. Stronger usage of TeFiEd
 
 ## Licence
 <b> 2023 ADBeta </b>  
