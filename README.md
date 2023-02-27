@@ -22,12 +22,16 @@ dependencies.
 
 ----
 ## TO-DO
-* Comment type substitution method. (struct for each lang)
+* language handler header
+* directory flags
+* multi-file detection and combination
 
 ## Changelog (Reminder for self)
 * 0.0 - Initial setup
 * 0.4 - basic functional model
 * 0.6 - changed entire methodolgy. Stronger usage of TeFiEd
+* 0.7 - Upgraded TeFiEd with replace
+* 1.0 - Finished the main line counting and modification routines.
 
 ## Licence
 <b> 2023 ADBeta </b>  

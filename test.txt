@@ -1,10 +1,10 @@
 
 
 
-test line /* comment */
+code /* comment */
 
 //hello
-test //this is a comment
+if statement //this is a comment
 
 	/* */
 	
@@ -13,9 +13,11 @@ test //this is a comment
 	/* comment
 	over 
 	multiple
+	/* hello4 */
 	lines */
 	
-	
+	/* comment	
+	*/ 
 	hello /*
 	multi line */
 
