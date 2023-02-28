@@ -1,7 +1,7 @@
 ﻿# codelines
 
-codelines counts the number of lines in code files, ignoring comments, blank or 
-empty lines and other non-valid lines - while counting every line of valid code.
+codelines counts the number of lines, and how many are code in singlefiles, multiple
+files and directories, ignoring comments, blank or empty space.
 
 It defaults to C/C++ styling but this can be changed via CLI options. 
 The file input can be a list of files, a directory, or a single file. See --help 
@@ -24,7 +24,7 @@ dependencies.
 ## TO-DO
 * language handler header
 * directory flags
-* multi-file detection and combination
+* sometimes program miscalculates total and overflows itself.
 
 ## Changelog (Reminder for self)
 * 0.0 - Initial setup
@@ -32,6 +32,7 @@ dependencies.
 * 0.6 - changed entire methodolgy. Stronger usage of TeFiEd
 * 0.7 - Upgraded TeFiEd with replace
 * 1.0 - Finished the main line counting and modification routines.
+* 1.5 - First multi-file version finished
 
 ## Licence
 <b> 2023 ADBeta </b>  

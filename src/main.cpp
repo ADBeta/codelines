@@ -7,8 +7,8 @@
 * C++ but has CLI flags to change the language.
 *
 * (c) ADBeta
-* v1.0
-* 27 Feb 2023
+* v1.5
+* 28 Feb 2023
 *******************************************************************************/
 #include <iostream>
 #include <string>
@@ -64,8 +64,8 @@ void removeMultiComments(TeFiEd &inFile) {
 		if(multiEndPos != npos) {
 			multiEndPos = multiEndPos + langSelected->multiCommentEnd.size();
 		}
-		////////////////////////////////////////////////////////////////////////
 		
+		////////////////////////////////////////////////////////////////////////
 		//If this line is not the start or end of a multi-comment string		
 		if(multiBegPos == std::string::npos && multiEndPos == std::string::npos) {
 			//If the current line is between multi-line comments, delete it
@@ -144,7 +144,7 @@ void removeBlankLines(TeFiEd &inFile) {
 int main(int argc, char *argv[]){
 	/*** Command Line setup ***************************************************/
 	//Configure CLIah
-	CLIah::Config::verbose = true; //Set verbosity when match is found
+	//CLIah::Config::verbose = true; //Set verbosity when match is found
 	CLIah::Config::stringsEnabled = true; //Enable arbitrary strings
 	
 	//Help flag
@@ -159,7 +159,7 @@ int main(int argc, char *argv[]){
 	CLIah::addNewArg(
 		"Output",
 		"--output",
-		CLIah::ArgType::flag,
+		CLIah::ArgType::subcommand,
 		"-o"
 	);
 	
@@ -196,14 +196,21 @@ int main(int argc, char *argv[]){
 	}
 	
 	/*** File Operations ******************************************************/
+	//TeFiEd output file pointer. Gets declared once if the output flag is set
+	TeFiEd *outFile;	
 	//TeFiEd input file pointer - might get swapped multiple times.
-	TeFiEd *codeFile;;
+	TeFiEd *codeFile;
 	
-	//Keep track of the lines in the file
-	size_t fileLines, codeLines;
+	//Keep track of the lines in the file, and globally
+	size_t fileLines, fileCode, globalLines, globalCode;
+	//And the code to line percent per file and globally
+	int filePercent, globalPercent;
 	
-	//Value to keep converted
-	int codePercent;
+	//If the output arg is found, create a new file to dump the output file to
+	if( CLIah::isDetected("Output") ) {
+		outFile = new TeFiEd( CLIah::getSubstring("Output") );
+		if( outFile->create() != 0) return 1;
+	}
 	
 	//Go through every string in the array, and try opening it as a file
 	for(size_t cFile = 0; cFile < CLIah::stringVector.size(); cFile++) { 
@@ -215,31 +222,55 @@ int main(int argc, char *argv[]){
 			return 1;
 		}
 		
-		//Print out the lines in the file before modification.
+		//Set the number of lines in the file, and add that to the global total
 		fileLines = codeFile->lines();
-		std::cout << codeFile->filename() << " Contains " << fileLines <<
-		          " lines\t\t" << std::flush;
+		globalLines += fileLines;
 		
 		//First remove the multi line comments
 		removeMultiComments(*codeFile);
 		//Remove the single comment lines from the file. leaves blank lines.
 		removeSingleComments(*codeFile);
-		//Lastly remove the blank lines, which is also a cleanup from the last steps
+		//Lastly remove the blank lines.
 		removeBlankLines(*codeFile);
 		
-		//Print out the file (maybe add vebose?) TODO
-		//for(size_t cLine = 1; cLine <= codeFile->lines(); cLine++) {
-		//	std::cout << codeFile->getLine(cLine) << std::endl;
-		//}
+		////////////////////////////////////////////////////////////////////////
+		//Append the modified file to the output file, if flag set
+		if( CLIah::isDetected("Output") ) {
+			for(size_t cLine = 1; cLine <= codeFile->lines(); cLine++) {
+				outFile->append( codeFile->getLine(cLine) );
+			}
+		}
 		
-		//Print lines after modification, and calculate the percentage
-		codeLines = codeFile->lines();
-		codePercent = ((float)codeLines / (float)fileLines) * 100.00;
-		std::cout << codeLines << " of which are code.\t\t" << "Which is "
-		          << codePercent << "%" << std::endl;
+		//Set the number of code lines, and calculate the file/code percentage
+		fileCode = codeFile->lines();
+		globalCode += fileCode;
 		
+		filePercent = ((float)fileCode / (float)fileLines) * 100;
+		
+		//Print the filename and information
+		std::cout << codeFile->filename() << "\n----------------------------\n" 
+		<< fileLines << "\tLines in file\n" << fileCode 
+		<< "\tLines of code\n" << filePercent << "%\tis code\n\n";
+		 
 		//Clear RAM of the TeFiEd object ready for end or next loop.
 		delete codeFile;
+	}
+	
+	//If multiple files have been passed, print a total counter too
+	if( CLIah::stringVector.size() > 1 ) {
+		globalPercent = ((float)globalCode / (float)globalLines) * 100;
+		
+		//Print the total information
+		std::cout << "Total" << "\n----------------------------\n" 
+		<< globalLines << "\tLines in total\n" << globalCode 
+		<< "\tLines of code\n" << globalPercent << "%\tis code\n\n";
+	}
+
+
+	////////////////////////////////////////////////////////////////////////////
+	//If output flag set, write the output file
+	if( CLIah::isDetected("Output") ) {
+		outFile->overwrite();
 	}
 
 	//Execution finished.	

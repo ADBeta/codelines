@@ -1,0 +1,489 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <limits>
+#include <algorithm> 
+#include "CLIah.hpp"
+std::string strToLower(std::string input) {
+	std::transform(input.begin(), input.end(), input.begin(), 
+		[](unsigned char chr){ return std::tolower(chr); }
+	);
+	return input;
+}
+namespace CLIah {
+	namespace Config {
+		bool stringsEnabled = false;
+		bool verbose = false;
+	} 
+unsigned int indexMax = std::numeric_limits<unsigned int>::max();
+std::vector <Arg> argVector;
+std::vector <String> stringVector;
+void argError(int errLevel, Arg &ref) {
+	std::cerr << "Error: CLIah: ";
+	if(ref.errMessage.empty() == 0) {
+		std::cerr << ref.errMessage << std::endl;
+	} else {
+		if(ref.type == ArgType::subcommand) {
+			std::cerr << "Argument \"" << ref.argReference << "\" " 
+			<< " is a subcommand but does not have any substring." << std::endl;
+		}
+	}
+	if(errLevel > 0) exit(EXIT_FAILURE);	
+}
+void printArg(const Arg &ref) {
+	std::cout << "Name            | " << ref.argReference << std::endl;
+	std::cout << "Argument(s)     | " << ref.priMatchStr << "  " 
+	          << ref.aliasMatchStr << std::endl;
+	std::string caseStr;
+	if(ref.caseSensitive == false) { caseStr = "False";
+	} else { caseStr = "True"; }
+	std::cout << "Case Sensitive  | " << caseStr << std::endl;
+	std::string typeStr;
+	if(ref.type == ArgType::flag) typeStr = "Flag";
+	if(ref.type == ArgType::subcommand) typeStr = "Subcommand";
+	if(ref.type == ArgType::variable) typeStr = "Variable";
+	std::cout << "Type            | " << typeStr << std::endl;
+	if(ref.type == ArgType::subcommand || ref.type == ArgType::variable) {
+		std::cout << "Substring       | " << ref.substring << std::endl;
+	}
+	std::cout << "Index           | " << ref.index << std::endl;
+	std::cout << std::endl;
+}
+void printString(const String &ref) {
+	std::cout << "String          | " << ref.string << std::endl;
+	std::cout << "Index           | " << ref.index << std::endl;
+	std::cout << std::endl;
+}
+bool argStringsMatch(const Arg &ref, std::string input) {
+	std::string priStr = ref.priMatchStr;
+	std::string aliasStr = ref.aliasMatchStr;
+	if(ref.caseSensitive == false) {
+		input = strToLower(input);
+		priStr = strToLower(priStr);
+		aliasStr = strToLower(aliasStr);
+	}
+	if(priStr.compare(input) == 0 || aliasStr.compare(input) == 0) {
+		return true;
+	}
+	return false;
+}
+void analyseArgs(int argc, char *argv[]) {
+	--argc;
+	++argv;
+	bool matchFound;
+	for(int argStrIdx = 0; argStrIdx < argc; argStrIdx++) {
+		std::string inputArg = argv[argStrIdx];
+		std::vector<Arg>::iterator itrtr; 
+		for(itrtr = argVector.begin(); itrtr != argVector.end(); itrtr++) {
+			if( (matchFound = argStringsMatch(*itrtr, inputArg)) == true) {
+				CLIah::ArgType tempType = itrtr->type;
+				if(tempType == CLIah::ArgType::subcommand) {
+					if(argStrIdx + 1 >= argc) {
+						argError(1, *itrtr);
+					}
+					++argStrIdx;
+					itrtr->substring = (std::string)argv[argStrIdx];
+				}
+				itrtr->detected = true;
+				itrtr->index = argStrIdx;
+				if(Config::verbose == true) {
+					std::cout << "A match was found for \"" 
+					          << inputArg << "\"" << std::endl;
+					printArg(*itrtr);
+				}
+				break;
+			}
+		} 
+		if(matchFound == false) {
+			if(Config::stringsEnabled == true) {
+				String tempString;
+				tempString.string = inputArg;
+				tempString.index = argStrIdx;
+				stringVector.push_back(tempString);
+				if(Config::verbose == true) {
+					std::cout << "A string was found" << std::endl;
+					printString(tempString);
+				}
+			} else {
+				std::cerr << "Error: CLIah: No matching Argument for input \"" 
+				          << inputArg << "\"" << std::endl;
+				exit(EXIT_FAILURE);
+			}
+		} 
+	} 
+}
+void addNewArg(const std::string ref, const std::string pri, const ArgType type,
+               const std::string alias, const bool caseSensitive) {
+	Arg newArg;
+	newArg.argReference = ref;
+	newArg.priMatchStr = pri;
+	newArg.type = type;
+	newArg.aliasMatchStr = alias;
+	newArg.caseSensitive = caseSensitive;
+	argVector.push_back(newArg);
+}
+void setErrorMessage(const std::string ref, const std::string msg) {
+	getArgByReference(ref)->errMessage = msg;
+}
+Arg *getArgByReference(const std::string refStr) {
+	Arg *argPtr = NULL;
+	std::vector<Arg>::iterator itrtr; 
+	for(itrtr = argVector.begin(); itrtr != argVector.end(); itrtr++) {
+		if(refStr.compare( itrtr->argReference ) == 0) {
+			argPtr = &(*itrtr);
+			break;
+		}
+	}
+	return argPtr;
+}
+Arg *getArgByIndex(unsigned int index) {
+	Arg *retArg = NULL;
+	std::vector<Arg>::iterator itrtr; 
+	for(itrtr = argVector.begin(); itrtr != argVector.end(); itrtr++) {
+		if(index == itrtr->index) {
+			retArg = &(*itrtr);
+			break;
+		}
+	}
+	return retArg;
+}
+String *getStringByIndex(unsigned int index) {
+	String *retString = NULL;
+	std::vector<String>::iterator itrtr; 
+	for(itrtr = stringVector.begin(); itrtr != stringVector.end(); itrtr++) {
+		if(index == itrtr->index) {
+			retString = &(*itrtr);
+			break;
+		}
+	}
+	return retString;
+}
+bool isDetected(const std::string refStr) {
+	Arg *ptrArg = getArgByReference(refStr);
+	return ptrArg->detected;
+}
+std::string getSubstring(const std::string refStr) {
+	Arg *ptrArg = getArgByReference(refStr);
+	return ptrArg->substring;
+}
+} 
+#include "TeFiEd.hpp"
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <cstring>
+TeFiEd::TeFiEd(const char* filename) {
+	m_filename = new char[ strlen(filename) + 1 ];
+	strcpy(m_filename, filename);
+}
+TeFiEd::TeFiEd(const std::string filename) {
+	m_filename = new char[ filename.size() + 1 ];
+	strcpy(m_filename, filename.c_str());
+} 
+TeFiEd::~TeFiEd() {	
+	delete[] m_filename;
+	if(m_ramfile.size() != 0) {
+		this->flush();
+	}
+}
+std::string TeFiEd::filename() {
+	return (std::string)m_filename;
+}
+const char *TeFiEd::filename_c_str() {
+	return m_filename;
+}
+std::string TeFiEd::parentDir() {
+	std::string fn = this->filename();
+	if(fn.find('/') == std::string::npos) return "./";
+	return fn.substr(0, fn.find_last_of('/') + 1);
+}
+size_t TeFiEd::bytes() {
+	size_t byteCount = 0;
+	size_t vectElement = 0;
+	while(vectElement < m_ramfile.size()) {
+		byteCount += m_ramfile[vectElement].size();
+		++byteCount;
+		++vectElement;
+	}
+	return byteCount;
+}
+size_t TeFiEd::lines() {
+	return m_ramfile.size();
+}
+int TeFiEd::create() {
+	this->m_file.open(m_filename, std::ios::out | std::ios::trunc);
+	if(m_file.is_open() == 0) { 
+		errorMsg("create", "Could not create file");
+		return 1;
+	}
+	resetAndClose();
+	if(this->verbose == true) {
+		std::cout << "Create " << m_filename << " Successful" << std::endl;
+	}
+	return 0;
+}
+int TeFiEd::read() {
+	flush();
+	m_file.open(m_filename, std::ios::in);
+	if(m_file.is_open() == 0) {
+		errorMsg("read", "File does not exist");
+		return 1;
+	}
+	std::string lineStr;
+	size_t byteCount = 0;
+	while(this->m_file.peek() != EOF) {
+		std::getline(this->m_file, lineStr);
+		byteCount += lineStr.size();
+		++byteCount;
+		if(byteCount > MAX_RAM_BYTES) {
+			errorMsg("read", "File exceeds MAX_RAM_BYTES :", MAX_RAM_BYTES);
+			return 1;
+		}
+		this->m_ramfile.push_back(lineStr);
+	}
+	resetAndClose();
+	if(this->verbose == true) {
+		std::cout << "Read " << m_filename << " Successful: " << byteCount 
+		  << " bytes, " << this->lines() << " lines." << std::endl;
+	}
+	isOpenFlag = true;
+	return 0;
+}
+bool TeFiEd::isOpen() {
+	isOpenFlag = m_file.is_open();	
+	return isOpenFlag;
+}
+std::string TeFiEd::getLine(size_t index) {
+	if(index == 0) return "";
+	--index;
+	if(index > this->m_ramfile.size() - 1) {
+		errorMsg("getLine", "Line", index + 1, "does not exist");
+		return "";
+	}
+	return this->m_ramfile[index];
+}
+int TeFiEd::overwrite() {
+	this->m_file.open(m_filename, std::ios::out | std::ios::trunc);
+	if(m_file.is_open() == 0) { 
+		errorMsg("overwrite", "Could not create file");
+		return 1;
+	}
+	for(std::string lineStr : this->m_ramfile) {
+		m_file << lineStr << std::endl;
+	}
+	resetAndClose();
+	if(this->verbose == true) {
+		std::cout << "Overwrite " << m_filename << " Successful: wrote "
+		  << this->bytes() << " bytes, " << this->lines() << " lines." 
+		  << std::endl;
+	}
+	return 0;
+}
+int TeFiEd::writeTo(TeFiEd &target) {
+	target.m_file.open(target.m_filename, std::ios::out | std::ios::trunc);
+	if(target.m_file.is_open() == 0) { 
+		errorMsg("writeTo", "Could not create file ", target.m_filename);
+		return 1;
+	}
+	for(std::string lineStr : this->m_ramfile) {
+		target.m_file << lineStr << std::endl;
+	}
+	target.resetAndClose();
+	if(this->verbose == true) {
+		std::cout << "Write to " << target.m_filename << " Successful: wrote "
+			<< this->bytes() << " bytes, " << this->lines() << " lines."
+			<< std::endl;
+	}
+	return 0;
+}
+void TeFiEd::flush() {
+	m_ramfile.clear();
+	m_ramfile.shrink_to_fit();
+}
+void TeFiEd::convertLineEnding(const LineEnding type) {
+	size_t wrongLines = 0;
+	size_t cLine = 0;
+	while(cLine < m_ramfile.size()) {
+		char lastChar = m_ramfile[cLine].back();
+		if(type == LineEnding::Unix) {
+			if(lastChar == 0x0D) {
+				m_ramfile[cLine].pop_back();		
+				++wrongLines;
+			}
+		} else if (type == LineEnding::DOS) {
+			if(lastChar != 0x0D) {
+				m_ramfile[cLine].push_back(0x0D);
+				++wrongLines;
+			}
+		}
+		++cLine;
+	}
+	if(this->verbose == true) {
+		if(type == LineEnding::Unix) {
+			std::cout << "Unix ";
+		} else if(type == LineEnding::DOS) {
+			std::cout << "DOS ";
+		}
+		std::cout << "Line Ending Conversion done. " << wrongLines 
+		          << " lines changed. " << std::endl;
+	}
+}
+int TeFiEd::append(const std::string inStr) {
+	if(checkString(inStr) != 0) {
+		return 1;
+	}
+	m_ramfile.push_back(inStr);
+	return 0;
+}
+int TeFiEd::insertLine(size_t line, const std::string inStr) {
+	if(line > 0) {
+		--line;
+	}
+	if(line > m_ramfile.size()) {
+		errorMsg("insertLine", "Line", line + 1, "does not exist");
+		return 1;
+	}
+	if(checkString(inStr) != 0) {
+		return 1;
+	}
+	m_ramfile.insert(m_ramfile.begin() + line, inStr);
+	return 0;
+}
+int TeFiEd::appendLine(size_t line, const std::string inStr) {
+	if(line > 0) {
+		--line;
+	}
+	std::string catString = m_ramfile[line] + inStr;
+	if(checkString(catString) != 0) {
+		return 1;
+	}
+	m_ramfile[line].append(inStr);
+	return 0;
+}
+int TeFiEd::replace(size_t line, std::string inStr) {
+	if(line > 0) {
+		--line;
+	}
+	if(line > m_ramfile.size()) {
+		errorMsg("replsce", "Line", line + 1, "does not exist");
+		return 1;
+	}	
+	if(checkString(inStr) != 0) {
+		return 1;
+	}
+	m_ramfile[line] = inStr;
+	return 0;
+}
+int TeFiEd::remove(size_t index) {
+	if(index > 0) {
+		--index;
+	}
+	if(index > m_ramfile.size()) {
+		errorMsg("removeLine", "Line", index + 1, "does not exist");
+		return 1;
+	}
+	m_ramfile.erase(m_ramfile.begin() + index);
+	m_ramfile.shrink_to_fit();
+	return 0;
+}
+std::string TeFiEd::getWord(const size_t line, unsigned int index) {
+	std::string input = getLine(line);
+	return getWord(input, index);
+}
+std::string TeFiEd::getWord(const std::string input, unsigned int index) {
+	if(index == 0) index = 1;
+	std::string output;
+	const std::string delim = " .,;\t\r";
+	size_t wordStart = 0, wordEnd = 0, wordIndex = 0;
+	do {
+		wordStart = input.find_first_not_of(delim, wordEnd);	
+		wordEnd = input.find_first_of(delim, wordStart);
+		if(wordStart != std::string::npos) {
+			++wordIndex;
+			if(wordIndex == index) {
+				output = input.substr(wordStart, wordEnd - wordStart);
+				break;
+			}
+		}
+	} while(wordStart < input.size());	
+	if(wordIndex < index) {
+		output = "";
+	}
+	return output;
+}
+size_t TeFiEd::find(std::string search, size_t offset) {
+	if(offset < 1) offset = 1;
+	size_t lineCount = lines() + 1; 
+	for(size_t cLine = offset; cLine < lineCount; cLine++) {
+		std::string lineStr = getLine(cLine);
+		if(lineStr.find(search) != std::string::npos) {
+			return cLine;
+		}
+	}
+	return 0;
+}
+size_t TeFiEd::findFirst(std::string search) {
+	size_t lineCount = lines() + 1; 
+	for(size_t cLine = 1; cLine < lineCount; cLine++) {
+		std::string lineStr = getLine(cLine);
+		if(lineStr.find(search) != std::string::npos) {
+			return cLine;
+		}
+	}
+	return 0;
+}
+size_t TeFiEd::findNext(std::string search) {
+	static std::string lastSearch;
+	static size_t cLine = 0;
+	if(search != lastSearch) {
+		cLine = 1;
+		lastSearch = search;
+	}
+	size_t matchLine = 0;
+	size_t lineCount = lines() + 1; 
+	while(cLine < lineCount) {
+		std::string lineStr = getLine(cLine);
+		if(lineStr.find(search) != std::string::npos) {
+			matchLine = cLine;
+			++cLine;
+			break;
+		}
+		++cLine;
+	}
+	return matchLine;
+}
+int TeFiEd::checkString(std::string testString) {
+	size_t stringSize = testString.size();
+	if(stringSize > MAX_STRING_SIZE) {
+		errorMsg("Input string exceeds MAX_STRING_SIZE :",
+			MAX_STRING_SIZE);
+		return 1;
+	}
+	if((this->bytes() + stringSize + 1) > MAX_RAM_BYTES) {
+		errorMsg("String addition causes file to exceed MAX_RAM_BYTES :",
+			MAX_RAM_BYTES);
+		return 2;
+	}
+	return 0;
+}
+void TeFiEd::resetAndClose() {
+	m_file.clear();
+	m_file.seekg(0, std::ios::beg);
+	m_file.close();
+	isOpenFlag = false;
+}
+template <typename T1, typename T2, typename T3>
+void TeFiEd::errorMsg(std::string func, T1 msg1, T2 msg2, T3 msg3) {
+	std::cerr << "Error: " << this->m_filename << ": " << func << ": ";
+	std::cerr << msg1 << " " << msg2 << " " << msg3 << '.' << std::endl;
+}
+template <typename T1, typename T2>
+void TeFiEd::errorMsg(std::string func, T1 msg1, T2 msg2) {
+	std::cerr << "Error: " << this->m_filename << ": " << func << ": ";
+	std::cerr << msg1 << " " << msg2 << '.' <<std::endl;
+}
+template <typename T1>
+void TeFiEd::errorMsg(std::string func, T1 msg1) {
+	std::cerr << "Error: " << this->m_filename << ": " << func << ": ";
+	std::cerr << msg1 << '.' <<std::endl;
+}
